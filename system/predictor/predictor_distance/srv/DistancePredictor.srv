@@ -1,0 +1,4 @@
+float32[] distance
+---
+float32[] distr_prob
+uint8 index_max

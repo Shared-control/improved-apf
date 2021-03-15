@@ -1,0 +1,4 @@
+delta_time: 0.02 #seconds
+max_abs_velocity: 1 #max value is 5
+diagonal: 50
+goal_radius: 0.08 #0.05 #0.20 #0.15 #m min value = 0.05

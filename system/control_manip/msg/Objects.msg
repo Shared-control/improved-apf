@@ -1,0 +1,4 @@
+GoalArray goals
+geometry_msgs/PoseArray obstacles
+trajectory_msgs/JointTrajectoryPoint joints
+geometry_msgs/PoseArray escape_points

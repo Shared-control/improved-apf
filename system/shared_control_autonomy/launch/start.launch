@@ -1,0 +1,62 @@
+<launch>
+    <arg name="sim" default="false" />
+    <!--distance_prediction: True = prediction based on distance, False = prediciton based on MaxEnt IOC + assistance-->
+    <arg name="distance_predictor" default="false"/>
+    <arg name="teleop" default="false" />
+    <arg name="gripper" default="false" />
+    <arg name="robot_type" default="/ur5" />
+    <arg name="grasp" default="false" />
+    <arg name="index_test" default="0" />
+    <arg name="user_type" default="keyboard" />
+    <arg name="name_user_test" default="user" />
+    <arg name="dynamic" default="false" />
+
+    <arg name="escape" default="true" />
+
+    <group ns="$(arg robot_type)" >
+        <node pkg="control_manip" type="control_manip_manager_node" name="control_manip_node" output="screen">
+            <param name="sim" type="bool" value="$(arg sim)" />
+            <param name="gripper" type="bool" value="$(arg gripper)" />
+            <param name="robot_type" type="string" value="$(arg robot_type)"  />
+            <param name="dynamic" type="bool" value="$(arg dynamic)" />
+            <remap from="$(arg robot_type)/control_manip_node/objects_srv" to="$(arg robot_type)/objects_srv" />
+            <remap from="$(arg robot_type)/control_manip_node/move_srv" to="$(arg robot_type)/move_srv" />
+            <remap from="$(arg robot_type)/control_manip_node/objects_msg" to="$(arg robot_type)/objects_msg" if="$(eval dynamic)" />
+        </node>   
+
+        <rosparam command="load" file="$(find shared_control_autonomy)/config/potential_field.yaml"/>
+        <rosparam command="load" file="$(find shared_control_autonomy)/config/config_params.yaml"/>
+        <node pkg="shared_control_autonomy" type="SharedControlNode.py" name="shared_control_node" output="screen">
+            <param name="robot_type" type="string" value="$(arg robot_type)" /> 
+            <param name="distance_predictor" type="bool" value="$(arg distance_predictor)" />
+            <param name="teleop" type="bool" value="$(arg teleop)" />
+            <param name="grasp" type="bool" value="$(arg grasp)" />
+            <param name="index_test" type="int" value="$(arg index_test)" />
+            <param name="user_type" type="string" value="$(arg user_type)" />
+            <param name="name_user_test" type="string" value="$(arg name_user_test)" />
+            <param name="dynamic" type="bool" value="$(arg dynamic)" />
+            <param name="gripper" type="bool" value="$(arg gripper)" />
+            
+            <param name="escape" type="bool" value="$(arg escape)" />
+
+        </node>
+
+        <!--Launch grasping node-->
+        <node pkg="grasp" type="GraspNode.py" name="grasp_node" output="screen" if="$(eval grasp)"></node>
+
+        <!--Launch predictor-->
+        <group if="$(arg distance_predictor)" >
+            <node pkg="predictor_distance" type="PredictorDistanceNode.py" name="prediction_node" output="screen" >
+                <param name="robot_type" type="string" value="$(arg robot_type)" /> 
+            </node>
+        </group>   
+
+        <group unless="$(arg distance_predictor)" >
+            <node pkg="predictor_assistance" type="PredictorAssistanceNode.py" name="prediction_node" output="screen" >
+                <param name="robot_type" type="string" value="$(arg robot_type)" /> 
+            </node>
+        </group>
+    
+    
+    </group>
+</launch>

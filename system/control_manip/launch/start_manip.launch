@@ -1,0 +1,19 @@
+<launch>
+    <arg name="sim" default="false" />
+    <arg name="gripper" default="false" />
+    <arg name="robot_type" default="/ur5" />
+    <arg name="dynamic" default="false" />
+
+    <group ns="$(arg robot_type)" >
+        <node pkg="control_manip" type="control_manip_manager_node" name="control_manip_node" output="screen">
+            <param name="sim" type="bool" value="$(arg sim)" />
+            <param name="gripper" type="bool" value="$(arg gripper)" />
+            <param name="robot_type" type="string" value="$(arg robot_type)"  />
+            <param name="dynamic" type="bool" value="$(arg dynamic)" />
+        
+            <remap from="$(arg robot_type)/control_manip_node/objects_srv" to="$(arg robot_type)/objects_srv" />
+            <remap from="$(arg robot_type)/control_manip_node/move_srv" to="$(arg robot_type)/move_srv" />
+            <remap from="$(arg robot_type)/control_manip_node/objects_msg" to="$(arg robot_type)/objects_msg" if="$(eval dynamic)" />
+        </node>    
+    </group>
+</launch>

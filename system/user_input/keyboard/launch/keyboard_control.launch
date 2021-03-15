@@ -1,0 +1,5 @@
+<launch>
+    <node name="keyboard_node" pkg="keyboard" type="keyboard_node.py" output="screen">
+        <remap from="key_command" to="/ur5/user_command" />
+    </node>
+</launch>

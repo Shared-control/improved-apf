@@ -1,0 +1,18 @@
+<launch>
+    <node name="myo_node" pkg="rosmyo" type="rosmyo_node" output="screen">
+        <param name="~emg_enabled" value="true" />
+        <param name="~imu_enabled" value="true" />
+        <param name="~classifier_enabled" value="true" />
+        <!--param name="~myo_identifier" value="IASLabMyo1" /-->
+        <param name="~myo_identifier" value="IASLabMyo2" />
+        <param name="~serial_port" value="/dev/ttyACM0" />
+    </node>
+
+    <node name="control_myo_node" pkg="myo" type="myo_node" output="screen" >
+        <remap from="imu" to="myo_node/imu" />
+        <remap from="gesture" to="myo_node/classifier_pose" />
+        <remap from="myo_command" to="/ur5/user_command" />
+        <remap from="reset_myo_srv" to ="/ur5/reset_myo_srv" />
+    </node>
+
+</launch>

@@ -1,0 +1,5 @@
+attractive_gain: 5
+repulsive_gain: 1
+threshold_distance: 0.14 #0.08 # m
+escape_gain: 1000
+
