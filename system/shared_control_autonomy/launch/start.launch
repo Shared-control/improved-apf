@@ -24,9 +24,9 @@
             <remap from="$(arg robot_type)/control_manip_node/objects_msg" to="$(arg robot_type)/objects_msg" if="$(eval dynamic)" />
         </node>   
 
-        <rosparam command="load" file="$(find shared_control_autonomy)/config/potential_field.yaml"/>
-        <rosparam command="load" file="$(find shared_control_autonomy)/config/config_params.yaml"/>
-        <node pkg="shared_control_autonomy" type="SharedControlNode.py" name="shared_control_node" output="screen">
+        <rosparam command="load" file="$(find shared_control)/config/potential_field.yaml"/>
+        <rosparam command="load" file="$(find shared_control)/config/config_params.yaml"/>
+        <node pkg="shared_control" type="SharedControlNode.py" name="shared_control_node" output="screen">
             <param name="robot_type" type="string" value="$(arg robot_type)" /> 
             <param name="distance_predictor" type="bool" value="$(arg distance_predictor)" />
             <param name="teleop" type="bool" value="$(arg teleop)" />
