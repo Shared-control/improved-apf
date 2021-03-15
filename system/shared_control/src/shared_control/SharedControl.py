@@ -10,7 +10,6 @@ from std_msgs.msg import String
 
 
 import rospy
-#import std_msgs.msg
 from geometry_msgs.msg import Pose
 from control_manip.srv import InitObj as initobjSrv
 from control_manip.srv import Move as moveSrv
@@ -19,9 +18,9 @@ from control_manip.msg import GoalArray as goalarrayMsg
 from control_manip.msg import Objects as objectsMsg
 from control_manip.msg import Status as statusMsg
 from control_manip.msg import Command as commandMsg
-from shared_control_autonomy.msg import InitPredictor as initPredictorMsg
+from shared_control.msg import InitPredictor as initPredictorMsg
 
-from shared_control_autonomy.srv import InitPred  as initPredSrv 
+from shared_control.srv import InitPred  as initPredSrv 
 
 from predictor_distance.srv import DistancePredictor as distancePredictorSrv
 from predictor_assistance.srv import AssistancePredictor as assistancePredictorSrv
@@ -98,12 +97,6 @@ class SharedControl:
         self._LEN_TWIST_VECTOR = 6
 
         self._ZT = 1.20
-
-        self.JOINT_NAMES = ['shoulder_pan_joint', 'shoulder_lift_joint', 'elbow_joint', 'wrist_1_joint', 'wrist_2_joint', 'wrist_3_joint']
-        self._client = actionlib.SimpleActionClient('/ur5/follow_joint_trajectory', FollowJointTrajectoryAction)
-        print("Waiting for server...")
-        self._client.wait_for_server()
-        print("Connected to server")
 
         #Variables for dynamic system: only obstacles can change, not goals
         if(self._dynamic_system):
@@ -184,7 +177,6 @@ class SharedControl:
                 print("Shutdown")
                 sys.exit()
 
-        
 
     def initPredictorConnection(self):
         """
@@ -254,8 +246,7 @@ class SharedControl:
             sys.exit()
 
 
-        response_obj = self.serviceObject(True)       
-        #initial pose for UR: angles of the joints on the table in the initial position
+        response_obj = self.serviceObject(True)
         init_q = Utils.getInitJoints(response_obj.objects.joints) 
         actual_pose_matrix_ee = self._rob_kin.get_pose(init_q, self._indexEE)
         actual_position_ee = self._rob_kin.getPosition(init_q, self._indexEE)
@@ -302,7 +293,6 @@ class SharedControl:
         self.initPredictorConnection()
 
         #Use InitPred srv to initialize predictor node
-        #It is possible to leave EE_matrix because both predictors do not consider the z-axis
         ee_pose_msg = Utils.matrixToPoseMsg(actual_pose_matrix_ee)
         if(not self.serviceInitPred(goal_msg, ee_pose_msg)):
             rospy.logerr("Error init predictor node")
@@ -333,21 +323,9 @@ class SharedControl:
 
         print("Ready to move to goal")
         while(not ((distance < self._goal_radius) and (z_actual < self._ZT))):
-            #User input twist
             twist_user_input = np.zeros(self._LEN_TWIST_VECTOR)
             
-            while(np.linalg.norm(twist_user_input) == 0):
-                
-                if(self._user_input_type != "myo"):
-                    if(self._userinput.getCommand() != UserCommand.TWIST and (self._userinput.getCommand() != None)):
-                        print("FAIL")
-                        print(self._userinput.getCommand())
-                        self.returnOrFinish()
-                        self._print_file.write("TEST FAILED")
-                        self._print_file.close()
-                        self._index_test += 1
-                        return
-                
+            while(np.linalg.norm(twist_user_input) == 0):                
                 twist_user_input = self._userinput.getTwist()
             twist_user_input = Utils.setTwist(twist_user_input, self._vmax)
             print("Twist User: " +str(twist_user_input))
@@ -360,7 +338,6 @@ class SharedControl:
             if(self._predictor_type != self._distance_type):
                 #There is a user command
                 if(np.linalg.norm(twist_user_input) != 0):
-                    #Service to target assistance
                     response_assist = self.serviceAssistancePredictor(twist_user_input, np.zeros(self._LEN_TWIST_VECTOR), actual_pose_matrix_ee)
                     goal_distrib = response_assist.distr_prob
                     index_max = response_assist.index_max
@@ -374,17 +351,11 @@ class SharedControl:
             jacob_matr = self._rob_kin.evaluateJacobian(att_q, self._indexEE)
             new_q_clik, new_pose_ee_clik, new_final_twist = clik_o.computeCLIK(actual_position_ee, twist_user_input, jacob_matr)
 
-            start_move_time = time.time()
-
             #Send next pose to controller_ur_node for movement
             if(not self.serviceMove(commandMsg.MOVE, Utils.matrixToPoseMsg(new_pose_ee_clik))):
-                #if(not self.actionJointsMove(new_q_clik)):
                 rospy.logerr("Error movement!")
                 rospy.on_shutdown("Error movement")
                 sys.exit()
-
-            end_move_time = time.time()
-            #print("TIME TO MOVE: " +str(end_move_time-start_move_time))
 
             #Update params for loop: joints, position_ee and distance
             att_q = new_q_clik
@@ -401,7 +372,7 @@ class SharedControl:
                     init_dist[i] = dist
                 else:
                     #dist = Utils.computeDistance(actual_position_ee, targets_position[i])
-                    dist = Utils.computeDistanceXY(actual_position_gripper, targets_position[i])
+                    dist = Utils.computeDistanceXY(actual_position_ee, targets_position[i])
                     init_dist[i] = dist
 
             #Prediction based on distance: service to compute probability
@@ -471,10 +442,7 @@ class SharedControl:
             rospy.on_shutdown("Error movement")
             sys.exit()
 
-
-        #Get init joints values, goals, obstacles and escape points
         response_obj = self.serviceObject(True)
-        #initial pose for UR: angles of the joints on the table in the initial position
         init_q = Utils.getInitJoints(response_obj.objects.joints) 
         actual_pose_matrix_ee = self._rob_kin.get_pose(init_q, self._indexEE)
         actual_position_ee = self._rob_kin.getPosition(init_q, self._indexEE)
@@ -495,18 +463,15 @@ class SharedControl:
 
         #Fixed Obstacles array
         obs_position = Utils.getListPoints(response_obj.objects.obstacles)
-        #print("SIZE OBS: " +str(len(obs_position)))
 
         #Escape points
         escape_points = Utils.getListPoints(response_obj.objects.escape_points)
-        #print("SIZE ESCAPE: " +str(len(escape_points)))
         
         #Goal array
         goal_list = list()
         targets_position = list()
         goal_msg = response_obj.objects.goals
         goal_list, targets_position = Utils.getGoal(goal_msg)
-        #print("SIZE GOAL: " +str(len(goal_list)))
 
         self._print_file.write("Goals list")
         for goal in goal_list:
@@ -529,7 +494,6 @@ class SharedControl:
         self.initPredictorConnection()
 
         #Use InitPred srv to initialize predictor node
-        #It is possible to leave EE_matrix because both predictors do not consider the z-axis
         ee_pose_msg = Utils.matrixToPoseMsg(actual_pose_matrix_ee)
         if(not self.serviceInitPred(goal_msg, ee_pose_msg)):
             rospy.logerr("Error init predictor node")
@@ -573,18 +537,7 @@ class SharedControl:
             twist_user_input = np.zeros(self._LEN_TWIST_VECTOR)
 
             #Always wait user twist command
-            while(np.linalg.norm(twist_user_input) == 0):
-                
-                if(self._user_input_type != "myo"):
-                    if(self._userinput.getCommand() != UserCommand.TWIST and (self._userinput.getCommand() != None)):
-                        print("FAIL")
-                        print(self._userinput.getCommand())
-                        self.returnOrFinish()
-                        self._print_file.write("TEST FAILED")
-                        self._print_file.close()
-                        self._index_test += 1
-                        return
-                
+            while(np.linalg.norm(twist_user_input) == 0):                
                 twist_user_input = self._userinput.getTwist()
             twist_user_input = Utils.setTwist(twist_user_input, self._vmax)
             print("Twist User: " +str(twist_user_input))
@@ -607,7 +560,7 @@ class SharedControl:
                     #print("Twist A: " +str(twist_a))
 
             #Compute twist_ca from potential field
-            twist_ca = pot_func.newGetCATwist(att_q, self._vmax, goal_distrib)
+            twist_ca = pot_func.getCATwist(att_q, self._vmax, goal_distrib)
             print("Twist CA: " +str(twist_ca))
 
             #Final twist
@@ -619,17 +572,11 @@ class SharedControl:
             #Since CLIK is used to move, it is correct use EE although gripper is active
             new_q_clik, new_pose_ee_clik, new_final_twist = clik_o.computeCLIK(actual_position_ee, final_twist, jacob_matr)
 
-            start_move_time = time.time()
             #Send next pose to controller_ur_node for movement
             if(not self.serviceMove(commandMsg.MOVE, Utils.matrixToPoseMsg(new_pose_ee_clik))):
-                #if(not self.actionJointsMove(new_q_clik)):
-                    #if(not self.jointsMove(commandMsg.MOVE, new_q_clik)):
                 rospy.logerr("Error")
                 rospy.on_shutdown("Error")
                 return
-            
-            end_move_time = time.time()
-            #print("TIME TO MOVE: " +str(end_move_time-start_move_time))
             
             #Update params for loop: joints, position_ee (and gripper), distribution and distance
             att_q = new_q_clik
@@ -646,7 +593,7 @@ class SharedControl:
                     init_dist[i] = dist
                 else:
                     #dist = Utils.computeDistance(actual_position_ee, targets_position[i])
-                    dist = Utils.computeDistanceXY(actual_position_gripper, targets_position[i])
+                    dist = Utils.computeDistanceXY(actual_position_ee, targets_position[i])
                     init_dist[i] = dist
 
             #Prediction based on distance: service to compute probability
@@ -722,7 +669,6 @@ class SharedControl:
             rospy.logerr("Error when user sends the HOME command")
             rospy.on_shutdown("Error")
         
-        #self.serviceResetMyo(True)
 
         '''
         if(self._user_input_type == "myo"):
@@ -886,37 +832,6 @@ class SharedControl:
         return response
 
 
-    def jointsMove(self, type_command, joints):
-        """
-        Service to send movement to controller manipulator node \n
-        Args:
-            type_command: type of command
-            pose: pose to go if type command is MOVE, PICK or PLACE
-        Return: true if motion has been completed, false otherwise
-        """
-        command_msg = commandMsg()
-        command_msg.command = type_command
-        command_msg.joints_pose = joints
-        response = self._service_move.call(command_msg)
-        return response
-
-
-    def actionJointsMove(self, joints):
-        global joints_pos
-        g = FollowJointTrajectoryGoal()
-        g.trajectory = JointTrajectory()
-        g.trajectory.joint_names = self.JOINT_NAMES
-        try:
-            joint_states = rospy.wait_for_message("/ur5/joint_states", JointState)
-            joints_pos = joint_states.position
-            g.trajectory.points = [JointTrajectoryPoint(positions=joints, velocities=[0]*6, accelerations=[0]*6, time_from_start=rospy.Duration(0.7))]
-            self._client.send_goal(g)
-            results = self._client.wait_for_result()
-            return True
-        except:
-            return False
-
-
     def callbackTableObjects(self, data):
         """
         Callback to manage objects on the table
@@ -1000,7 +915,7 @@ class SharedControl:
         clik_o = Clik.Clik(K, self._config_params[0], self._rob_kin, self._dynamic_joints)
         pot_func = pf.PotentialFunction(self._potential_params[0],self._potential_params[1],self._potential_params[2], self._potential_params[3], 
                                         self._dynamic_obstacles, self._rob_kin, self._dynamic_joints, targets_position, self._dynamic_escape_points, 
-                                        self._print_file, self._gripper_active)
+                                        self._print_file, self._gripper_active, self._escape_active)
         
         it = 0 #number of iterations
         att_q = copy.copy(self._dynamic_joints) #for while cicle->current vector q
@@ -1030,18 +945,7 @@ class SharedControl:
             twist_user_input = np.zeros(self._LEN_TWIST_VECTOR)
 
             #Always wait user twist command
-            while(np.linalg.norm(twist_user_input) == 0):
-
-                if(self._user_input_type != "myo"):
-                    if(self._userinput.getCommand() != UserCommand.TWIST and (self._userinput.getCommand() != None)):
-                        print("FAIL")
-                        print(self._userinput.getCommand())
-                        self.returnOrFinish()
-                        self._print_file.write("TEST FAILED")
-                        self._print_file.close()
-                        self._index_test += 1
-                        return
-                        
+            while(np.linalg.norm(twist_user_input) == 0):                        
                 twist_user_input = self._userinput.getTwist()
             twist_user_input = Utils.setTwist(twist_user_input, self._vmax)
             print("Twist User: " +str(twist_user_input))
@@ -1075,18 +979,12 @@ class SharedControl:
             jacob_matr = self._rob_kin.evaluateJacobian(att_q, self._indexEE)
             new_q_clik, new_pose_ee_clik, new_final_twist = clik_o.computeCLIK(actual_position_ee, final_twist, jacob_matr)
 
-            start_move_time = time.time()
             #Send next pose to controller_ur_node for movement
             if(not self.serviceMove(commandMsg.MOVE, Utils.matrixToPoseMsg(new_pose_ee_clik))):
-            #if(not self.actionJointsMove(new_q_clik)):
                 rospy.logerr("Error")
                 rospy.on_shutdown("Error")
                 return
             
-            end_move_time = time.time()
-            #print("TIME TO MOVE: " +str(end_move_time-start_move_time))
-
-
             #Update params for loop: joints, position_ee, distribution and distance
             att_q = new_q_clik
             actual_pose_matrix_ee = new_pose_ee_clik

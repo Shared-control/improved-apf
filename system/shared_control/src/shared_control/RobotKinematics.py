@@ -83,12 +83,6 @@ class RobotKinematics:
 
         if((self._robot_type == "ur10") or (self._robot_type == "/ur10")):
             #Matrix World -> base_link
-            '''
-            A_world_base = smp.Matrix(4, 4, [0, 1, 0, 0.56,
-                                            -1, 0, 0, 0.045,
-                                             0, 0, 1, 0.95,    
-                                             0, 0, 0, 1])
-            '''
             A_world_base = smp.Matrix(4, 4, [0, -1, 0, 0,
                                              1,  0, 0, 0,
                                              0,  0, 1, 0.95,    
@@ -114,9 +108,9 @@ class RobotKinematics:
                                1, 0, 0, 0,
                                0, 0, 0, 1])
 
-        Agripper = smp.Matrix(4, 4, [0, -1,  0, 0, #-0.005,
+        Agripper = smp.Matrix(4, 4, [0, -1,  0, 0,
                                      0,  0, -1, 0,
-                                     1,  0,  0, 0.16, #0.16 = 0.07 + 0.09 calcolato io no < 0.09
+                                     1,  0,  0, 0.16, 
                                      0,  0,  0, 1])
         
 
@@ -342,7 +336,7 @@ class RobotKinematics:
         minS = np.min(s)
         condition_number = maxS/minS
         w = 1./condition_number
-        cn_t = 50 #40 #33 #50
+        cn_t = 50
         w_t = 1./cn_t
         
         #damped least squares params

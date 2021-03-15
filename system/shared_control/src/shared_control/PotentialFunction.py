@@ -70,76 +70,6 @@ class PotentialFunction:
         self._actual_positions = new_positions
 
 
-
-
-
-    def getTotalPotential(self, new_q, goal_distribution):
-        """
-        Compute total force: attractive + repulsive.\n
-        Args:
-            new_q: actual angles q
-        Return: total force as joints velocities vector dot_q
-            total_force = total force as joints velocities vector dot_q
-        """
-        total_force = np.zeros(self._LEN_TWIST_VECTOR)
-        rep_force_ee = np.zeros(self._LEN_TWIST_VECTOR)
-        total_rep_force = np.zeros(self._LEN_TWIST_VECTOR)
-
-        #compute actual positions of all joints and EE from configuration new_q
-        self.updatePosition(new_q)
-
-        #for each control points check if it is under influence of potential field
-        for ap in range(len(self._actual_positions)):
-            #use to check distance from actual control point and the closest obstacle
-            min_distance = float('inf')
-            #obstacle id in obs_position list that is closest to the actual control point
-            idmin = -1 
-            #find the nearest obstacle and save id
-            for obs in range(len(self._obs_position)):
-                distance = Utils.computeDistance(self._actual_positions[ap], self._obs_position[obs])
-                if(distance < min_distance):
-                    min_distance = distance
-                    idmin = obs
-            #check if the control point is under influence of potential field and compute repulsive force
-            if(min_distance <= self._p0):
-                #Repulsive force for EE
-                if(ap == self._indexEE):
-                    rep_force_ee = self.getRepulsivePotential(min_distance, idmin, ap)
-                #Repulsive force for all other points, in this case joints
-                else:    
-                    rep_force = self.getRepulsivePotential(min_distance, idmin, ap)
-                    jacobian = self._rob_kin.evaluateJacobian(new_q, ap)
-                    jac_T = np.transpose(jacobian) 
-                    total_rep_force += np.dot(jac_T, rep_force)
-
-        #ONLY FOR EE
-        #Attractive escape potential
-        attr_escape_p = np.zeros(self._LEN_TWIST_VECTOR)
-        attr_escape_p = self.getEscapePotential()
-            
-        #EE components: Attractive + Repulsive
-        jac_ee = self._rob_kin.evaluateJacobian(new_q, self._indexEE)
-        jac_ee_T = np.transpose(jac_ee) 
-        
-        #Attractive goals
-        att_force_ee = self.getAttractivePotential(goal_distribution)
-
-        total_force_ee = np.zeros(self._LEN_TWIST_VECTOR)
-        if((np.linalg.norm(attr_escape_p) != 0)  and (not self.checkRange())):
-            print("Escape")
-            total_force_ee = rep_force_ee + attr_escape_p 
-        else:
-            print("NO ESCAPE")
-            total_force_ee = att_force_ee + rep_force_ee
-
-        total_ee = np.dot(jac_ee_T, total_force_ee)
-        
-        #Final force
-        total_force = total_ee + total_rep_force
-
-        return total_force
-
-
     def getAttractivePotential(self, goal_distribution):
         """
         Compute Goals attractive force only for EE:
@@ -155,7 +85,7 @@ class PotentialFunction:
         for i in range(len(self._goal_position)):
             distance = Utils.computeDistance(ee_position, self._goal_position[i])
             attr_pot = np.zeros(self._LEN_TWIST_VECTOR)
-            #Consider only linear component
+            #only linear component
             attr_pot[0:3] = goal_distribution[i] *(self._k_a/distance)*(self._goal_position[i][0:3] - ee_position[0:3])
             total_attr += attr_pot 
 
@@ -177,36 +107,10 @@ class PotentialFunction:
         rep_f = np.zeros(self._LEN_TWIST_VECTOR)
         ft = 1/p_x
         st = 1/self._p0
-        #consider only linear component
+        #only linear component
         rep_f[0:3] = self._neta * (ft - st) * (ft * ft) * ((self._actual_positions[idpos][0:3] - self._obs_position[idobs][0:3])/p_x)
         
         return rep_f
-
-
-    def getEscapePotential(self):
-        """
-        Compute attractive force of escape points only for EE \n
-        Active points are only those whose distance is less than the threshold value \n
-        Args:\n
-        Return: 
-            attractive force for EE to escape points
-        """
-        ee_position = self._actual_positions[self._indexEE]
-        total_attr_escape = np.zeros(self._LEN_TWIST_VECTOR)
-        th = 0.2 #Attractive escape points threshold
-        a = 0
-
-        for i, p in enumerate(self._escape_points):
-            distance = Utils.computeDistance(ee_position, p)
-            if(distance <= th):
-                attr_pot = np.zeros(self._LEN_TWIST_VECTOR)
-                attr_pot[0:3] = self._escape_constant * (p[0:3] - ee_position[0:3])
-                total_attr_escape += attr_pot
-                a += 1
-                
-        print("NUM ESCAPE POINTS ACTIVE: " +str(a))
-                
-        return total_attr_escape
 
 
     def checkRange(self, goal_distribution):
@@ -217,7 +121,7 @@ class PotentialFunction:
         ee_position = self._actual_positions[self._indexEE]
         x_ee, y_ee, z_ee = self.getSingleCoordiante(ee_position)
         
-        #Consider only the goal that has the highest probability
+        #only the goal that has the highest probability
         prob_max = max(goal_distribution)
         idx_goal_max_prob = goal_distribution.index(prob_max)
         closest_goal = self._goal_position[idx_goal_max_prob]
@@ -249,7 +153,6 @@ class PotentialFunction:
                     print("ERROR DIMENSION!")
                     sys.exit()
             if(flag == 3):
-                #print("C'è un punto tra ee e goal: rimangono attivi gli escape points")
                 return False
 
         return True
@@ -272,91 +175,6 @@ class PotentialFunction:
         return x, y, z
 
 
-    def getTwistCA(self, new_q, goal_distribution, vmax):
-        """
-        Compute Collision Avoidance twist
-        Args:
-            new_q: joints angle q
-            goal_distribution: probability distribution of goals
-            vmax: twist max value
-        Return:
-            collision avoidance twist in [-vmax, vmax]
-        """
-        twist_q = self.getTotalPotential(new_q, goal_distribution)
-        twist_ca = np.zeros(self._LEN_TWIST_VECTOR)
-        jacob_matr = self._rob_kin.evaluateJacobian(new_q, self._indexEE)
-        twist_ca = jacob_matr.dot(twist_q)
-        twist_ca = 2*Utils.setTwist(twist_ca, vmax)
-        
-        return twist_ca
-
-
-    def newTotalPotential(self, new_q, goal_distribution):
-        """
-        Compute total potential considering more repulsion points
-        Args:
-            new_q: joints angle q
-            goal_distribution: probability distribution of goals
-        Return:
-            total potential force
-        """
-        total_force = np.zeros(self._LEN_TWIST_VECTOR)
-        rep_force_ee = np.zeros(self._LEN_TWIST_VECTOR)
-        total_rep_force = np.zeros(self._LEN_TWIST_VECTOR)
-
-        #compute actual positions of all joints and EE from configuration new_q
-        self.updatePosition(new_q)
-
-        #for each control points check if it is under influence of potential field
-        for idx_ap, ap in enumerate(self._actual_positions):
-            id_point_list = []
-            obs_point_list = []
-            distance_list = []
-            for idx_obs, obs in enumerate(self._obs_position):
-                distance = Utils.computeDistance(ap, obs)
-                if(distance <= self._p0):
-                    id_point_list.append(idx_obs)
-                    obs_point_list.append(obs)
-                    distance_list.append(distance)
-            for i, idx_obs in enumerate(id_point_list):
-                if(idx_ap == self._indexEE):
-                    rep_force_ee += self.getRepulsivePotential(distance_list[i], idx_obs, idx_ap)
-                else:
-                    rep_force = self.getRepulsivePotential(distance_list[i], idx_obs, idx_ap)
-                    jacobian = self._rob_kin.evaluateJacobian(new_q, idx_ap)
-                    jac_T = np.transpose(jacobian) 
-                    total_rep_force += np.dot(jac_T, rep_force)
-
-        #Only for EE
-        #Attractive escape potential
-        attr_escape_p = np.zeros(self._LEN_TWIST_VECTOR)
-        attr_escape_p = self.getEscapePotential()
-
-        #EE components: Attractive + Repulsive
-        jac_ee = self._rob_kin.evaluateJacobian(new_q, self._indexEE)
-        jac_ee_T = np.transpose(jac_ee) 
-        
-        att_force_ee = self.getAttractivePotential(goal_distribution)
-        total_force_ee = np.zeros(self._LEN_TWIST_VECTOR)
-        if((np.linalg.norm(attr_escape_p) != 0)  and (not self.checkRange())):
-            print("Escape")
-            total_force_ee = rep_force_ee + attr_escape_p
-        else:
-            print("NO ESCAPE")
-            total_force_ee = att_force_ee + rep_force_ee 
-
-        total_ee = np.dot(jac_ee_T, total_force_ee)
-        
-        #Final force
-        total_force = total_ee + total_rep_force
-
-        return total_force
-
-    
-    
-    
-
-######################################################
     def createConstraints(self, goal_distribution):
         """
         Create lists of constraints C1, C2, C3. 
@@ -465,8 +283,8 @@ class PotentialFunction:
         return c3_list
 
 
-    def newGetCATwist(self, new_q, vmax, goal_distribution):
-        twist_q = self.getNewNewTotalPotential(new_q, goal_distribution)
+    def getCATwist(self, new_q, vmax, goal_distribution):
+        twist_q = self.getTotalPotential(new_q, goal_distribution)
         twist_ca = np.zeros(self._LEN_TWIST_VECTOR)
         jacob_matr = self._rob_kin.evaluateJacobian(new_q, self._indexEE)
         twist_ca = jacob_matr.dot(twist_q)
@@ -475,7 +293,7 @@ class PotentialFunction:
         return twist_ca
 
 
-    def getNewNewTotalPotential(self, new_q, goal_distribution):
+    def getTotalPotential(self, new_q, goal_distribution):
         total_force = np.zeros(self._LEN_TWIST_VECTOR)
         rep_force_ee = np.zeros(self._LEN_TWIST_VECTOR)
         total_rep_force = np.zeros(self._LEN_TWIST_VECTOR)
@@ -523,10 +341,9 @@ class PotentialFunction:
         attr_escape_p = np.zeros(self._LEN_TWIST_VECTOR)
         if((not self.checkRange(goal_distribution)) and (self._escape_active)):
             print("ESCAPE")
-            attr_escape_p = self.getNewNewEscapePotential(goal_distribution)
+            attr_escape_p = self.getEscapePotential(goal_distribution)
 
         total_force_ee = att_force_ee + rep_force_ee + attr_escape_p
-        print("Escape: " +str(attr_escape_p))
         total_ee = np.dot(jac_ee_T, total_force_ee)   
         
         #Final force
@@ -535,7 +352,7 @@ class PotentialFunction:
         return total_force
 
 
-    def getNewNewEscapePotential(self, goal_distribution):
+    def getEscapePotential(self, goal_distribution):
         ee_position = self._actual_positions[self._indexEE]
         total_attr_escape = np.zeros(self._LEN_TWIST_VECTOR)
         
@@ -570,7 +387,7 @@ class PotentialFunction:
     def getDynamicCATwist(self, new_q, vmax, goal_distribution, new_obstacles, new_escape):
         self.updateParams(new_obstacles, new_escape)
         
-        twist_q = self.getNewNewTotalPotential(new_q, goal_distribution)
+        twist_q = self.getTotalPotential(new_q, goal_distribution)
         twist_ca = np.zeros(self._LEN_TWIST_VECTOR)
         jacob_matr = self._rob_kin.evaluateJacobian(new_q, self._indexEE)
         twist_ca = jacob_matr.dot(twist_q)
