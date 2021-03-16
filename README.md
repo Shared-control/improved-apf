@@ -53,4 +53,4 @@ $ roslaunch shared_control start.launch sim:=BOOL_SIM gripper:=BOOL_GRIPPER gras
    * where *BOOL_TELEOP == true* to activate teleoperation system, otherwise *BOOL_TELEOP == false* to activate shared-control system.
    * where *BOOL_ESCAPE == true* to activate our framework with improved APF with escape points; otherwise *BOOL_ESCAPE == false* to activate only APF shared-control system.
    * where *BOOL_DYNAMIC == true* to activate dynamic version of our framework; otherwise *BOOL_DYNAMIC == false* to activate static version.
-   * where *USER_TYPE == "keyboard"* if the keyboard control is launched; *BOOL_DYNAMIC == "joystick"* if the joystick control is launched; *BOOL_DYNAMIC == "myo"* if myo control is launched
+   * where *USER_TYPE == "keyboard"* if the keyboard control is launched; *USER_TYPE == "joystick"* if the joystick control is launched; *USER_TYPE == "myo"* if myo control is launched
