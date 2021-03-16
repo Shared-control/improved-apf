@@ -12,7 +12,7 @@ find_package(catkin REQUIRED COMPONENTS
   rospy
   std_msgs
   message_generation
-  shared_control_autonomy
+  shared_control
 )
 
 ## System dependencies are found with CMake's conventions

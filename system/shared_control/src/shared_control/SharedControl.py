@@ -286,7 +286,7 @@ class SharedControl:
                 init_dist.append(dist)
             else:
                 #dist = Utils.computeDistance(actual_position_ee, targets_position[i])
-                dist = Utils.computeDistanceXY(actual_position_gripper, targets_position[i])
+                dist = Utils.computeDistanceXY(actual_position_ee, targets_position[i])
                 init_dist.append(dist)
 
         #Init predictor service connection
@@ -487,7 +487,7 @@ class SharedControl:
                 init_dist.append(dist)
             else:
                 #dist = Utils.computeDistance(actual_position_ee, targets_position[i])
-                dist = Utils.computeDistanceXY(actual_position_gripper, targets_position[i])
+                dist = Utils.computeDistanceXY(actual_position_ee, targets_position[i])
                 init_dist.append(dist)
                         
         #Init predictor service connection
@@ -893,10 +893,10 @@ class SharedControl:
         init_dist = []
         for i in range(len(targets_position)):
             if(self._gripper_active):
-                dist = Utils.computeDistance(actual_position_gripper, targets_position[i])
+                dist = Utils.computeDistanceXY(actual_position_gripper, targets_position[i])
                 init_dist.append(dist)
             else:
-                dist = Utils.computeDistance(actual_position_ee, targets_position[i])
+                dist = Utils.computeDistanceXY(actual_position_ee, targets_position[i])
                 init_dist.append(dist)
         
         #Init predictor service connection
@@ -933,8 +933,10 @@ class SharedControl:
         #Time to reach target: timer start after first user command
         start_system = None
 
+        z_actual = None
+
         print("Ready to move to goal")
-        while(distance > self._goal_radius):
+        while(not ((distance < self._goal_radius) and (z_actual < self._ZT))):
             #Final twist for ee
             final_twist = np.zeros(self._LEN_TWIST_VECTOR)
             #Twist from target prediction and assistance node
@@ -995,10 +997,10 @@ class SharedControl:
 
             for i in range(len(init_dist)):
                 if(self._gripper_active):
-                    dist = Utils.computeDistance(actual_position_gripper, targets_position[i])
+                    dist = Utils.computeDistanceXY(actual_position_gripper, targets_position[i])
                     init_dist[i] = dist
                 else:
-                    dist = Utils.computeDistance(actual_position_ee, targets_position[i])
+                    dist = Utils.computeDistanceXY(actual_position_ee, targets_position[i])
                     init_dist[i] = dist
 
             #Prediction based on distance: service to compute probability
@@ -1008,6 +1010,11 @@ class SharedControl:
                 index_max = response_dist.index_max
             
             distance = init_dist[index_max]
+
+            if(self._gripper_active):
+                z_actual = actual_position_gripper[2]
+            else:
+                z_actual = actual_position_ee[2]
 
             #Print on file
             self._print_file.write_with_title(twist_user_input[0:3], "user_twist")

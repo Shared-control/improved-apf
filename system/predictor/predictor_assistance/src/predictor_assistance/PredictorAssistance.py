@@ -3,7 +3,7 @@
 import rospy
 from predictor_assistance.srv import AssistancePredictor, AssistancePredictorResponse
 from control_manip.msg import GoalArray as goalArrayMsg
-from shared_control_autonomy.srv import InitPred, InitPredResponse
+from shared_control.srv import InitPred, InitPredResponse
 
 import Utils
 import RobotState as rs

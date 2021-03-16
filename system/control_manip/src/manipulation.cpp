@@ -144,22 +144,7 @@ bool control_manip::Manipulation::goHome(){
     //Final Home position
     if(m_params.robot_type == UR5){
         if(m_params.gripper_active){
-            //target_joint = {-1.7245992542489166, -1.88258920455411, 1.8803642388147104, -1.5526888479315524, -1.5762037052030697, -0.14552496004955984};
-            //buona
-            //target_joint = {-1.7310751120196741, -1.8932765165912073, 1.9004158973693848, -1.593534294758932, -1.5361507574664515, 1.3594590425491333};
-        
-            //un pò più bassa
-            //target_joint = {-1.5838082472430628, -2.1561692396747034, 2.3652212619781494, -1.791187588368551, -1.5779131094561976, 1.487866997718811};
-        
-            //bassa e un pò più al centro del tavolo
-            //target_joint = {-1.7694810072528284, -2.2382643858539026, 2.3839426040649414, -1.724621597920553, -1.5702346006976526, 1.301730990409851};
-        
-            //ancora più al centro
-            //target_joint = {-1.9415624777423304, -2.2549594084369105, 2.3801958560943604, -1.703080956135885, -1.5686028639422815, 1.1297327280044556};
-        
-            //target_joint = {-1.930413071309225, -2.2386844793902796, 2.3557651042938232, -1.669307057057516, -1.5627959410296839, -0.2986710707293909};
             target_joint = {-1.9337423483477991, -2.231931511555807, 2.3062686920166016, -1.626599136983053, -1.5628321806537073, -0.3018081823932093};
-
         }
         else{
             target_joint = HOME_JOINTS_NO_GRIPPER;
@@ -175,21 +160,23 @@ bool control_manip::Manipulation::goHome(){
         return false;
     }
 
-    //Activate and close gripper
-    if(m_params.gripper_active){
-        m_gripper_status = m_gripper.activation();
-        if(m_gripper_status == control_manip::Gripper::Status::STOP){
-            ROS_ERROR_STREAM("ERROR: NO ACTIVATION GRIPPER");
-            return false;
-        }
+    //Only in a real environment
+    if(!m_params.simulation){
+        //Activate and close gripper
+        if(m_params.gripper_active){
+            m_gripper_status = m_gripper.activation();
+            if(m_gripper_status == control_manip::Gripper::Status::STOP){
+                ROS_ERROR_STREAM("ERROR: NO ACTIVATION GRIPPER");
+                return false;
+            }
 
-        m_gripper_status = m_gripper.close();
-        if(m_gripper_status == control_manip::Gripper::Status::STOP){
-            ROS_ERROR_STREAM("ERROR: NO CLOSING GRIPPER");
-            return false;
-        }
-    }    
-
+            m_gripper_status = m_gripper.close();
+            if(m_gripper_status == control_manip::Gripper::Status::STOP){
+                ROS_ERROR_STREAM("ERROR: NO CLOSING GRIPPER");
+                return false;
+            }
+        }    
+    }
     return true;
 }
 
@@ -350,20 +337,23 @@ bool control_manip::Manipulation::pick(geometry_msgs::Pose pose){
         return execution;
     }
 
-    //Open gripper to pick object
-    m_gripper_status = m_gripper.getStatus();
-    if(m_gripper_status != control_manip::Gripper::Status::OPEN){
-        if(m_gripper_status == control_manip::Gripper::Status::DEACTIVE){
-            ROS_ERROR_STREAM("ERROR: GRIPPER IS DEACTIVE");
-            return false;
-        }
-        m_gripper_status = m_gripper.open();
-        if(m_gripper_status == control_manip::Gripper::Status::STOP){
-            ROS_ERROR_STREAM("ERROR: NO OPEN GRIPPER");
-            return false;
+    //Only in a real environment
+    if(!m_params.simulation){
+        //Open gripper to pick object
+        m_gripper_status = m_gripper.getStatus();
+        if(m_gripper_status != control_manip::Gripper::Status::OPEN){
+            if(m_gripper_status == control_manip::Gripper::Status::DEACTIVE){
+                ROS_ERROR_STREAM("ERROR: GRIPPER IS DEACTIVE");
+                return false;
+            }
+            m_gripper_status = m_gripper.open();
+            if(m_gripper_status == control_manip::Gripper::Status::STOP){
+                ROS_ERROR_STREAM("ERROR: NO OPEN GRIPPER");
+                return false;
+            }
         }
     }
-    
+
     //Down EE
     geometry_msgs::Pose final_pose;
     final_pose.position = pose.position;
@@ -374,20 +364,23 @@ bool control_manip::Manipulation::pick(geometry_msgs::Pose pose){
         return execution;
     }
 
-    //std::cout << "Close" <<std::endl;
-    m_gripper_status = m_gripper.close();
-    if(m_gripper_status == control_manip::Gripper::Status::STOP){
-        ROS_ERROR_STREAM("ERROR: NO CLOSING GRIPPER");
-        return false;
-    }
+    //Only in a real environment
+    if(!m_params.simulation){
+        //std::cout << "Close" <<std::endl;
+        m_gripper_status = m_gripper.close();
+        if(m_gripper_status == control_manip::Gripper::Status::STOP){
+            ROS_ERROR_STREAM("ERROR: NO CLOSING GRIPPER");
+            return false;
+        }
 
-    ros::Duration(1.0).sleep();
+        ros::Duration(1.0).sleep();
 
-    //std::cout << "Open" <<std::endl;
-    m_gripper_status = m_gripper.open();
-    if(m_gripper_status == control_manip::Gripper::Status::STOP){
-        ROS_ERROR_STREAM("ERROR: NO OPEN GRIPPER");
-        return false;
+        //std::cout << "Open" <<std::endl;
+        m_gripper_status = m_gripper.open();
+        if(m_gripper_status == control_manip::Gripper::Status::STOP){
+            ROS_ERROR_STREAM("ERROR: NO OPEN GRIPPER");
+            return false;
+        }
     }
 
     return true;
@@ -407,17 +400,20 @@ bool control_manip::Manipulation::place(geometry_msgs::Pose pose){
         return execution;
     }
 
-    //Close gripper
-    m_gripper_status = m_gripper.getStatus();
-    if(m_gripper_status != control_manip::Gripper::Status::CLOSE){
-        if(m_gripper_status == control_manip::Gripper::Status::DEACTIVE){
-            ROS_ERROR_STREAM("ERROR: GRIPPER IS DEACTIVE");
-            return false;
-        }
-        m_gripper_status = m_gripper.close();
-        if(m_gripper_status == control_manip::Gripper::Status::STOP){
-            ROS_ERROR_STREAM("ERROR: NO CLOSING GRIPPER");
-            return false;
+    //Only in a real environment
+    if(!m_params.simulation){
+        //Close gripper
+        m_gripper_status = m_gripper.getStatus();
+        if(m_gripper_status != control_manip::Gripper::Status::CLOSE){
+            if(m_gripper_status == control_manip::Gripper::Status::DEACTIVE){
+                ROS_ERROR_STREAM("ERROR: GRIPPER IS DEACTIVE");
+                return false;
+            }
+            m_gripper_status = m_gripper.close();
+            if(m_gripper_status == control_manip::Gripper::Status::STOP){
+                ROS_ERROR_STREAM("ERROR: NO CLOSING GRIPPER");
+                return false;
+            }
         }
     }
 
