@@ -1,4 +1,7 @@
-# improved-apf
+# Improved-apf
+
+Shared Control in Robot Teleoperation With Improved Potential Fields
+
 
 ### Introduction
 Shared-control teleoperation framework based on Artificial Potential Fields improved by the generation of escape points around the obstacles.
@@ -54,3 +57,21 @@ $ roslaunch shared_control start.launch sim:=BOOL_SIM gripper:=BOOL_GRIPPER gras
    * where *BOOL_ESCAPE == true* to activate our framework with improved APF with escape points; otherwise *BOOL_ESCAPE == false* to activate only APF shared-control system.
    * where *BOOL_DYNAMIC == true* to activate dynamic version of our framework; otherwise *BOOL_DYNAMIC == false* to activate static version.
    * where *USER_TYPE == "keyboard"* if the keyboard control is launched; *USER_TYPE == "joystick"* if the joystick control is launched; *USER_TYPE == "myo"* if myo control is launched
+
+
+### Citation
+
+If you use this code in your project, please cite the associated paper:
+
+Gottardi, A., Tortora, S., Tosello, E., & Menegatti, E. (2022). Shared Control in Robot Teleoperation With Improved Potential Fields. IEEE Transactions on Human-Machine Systems.
+[[DOI]](https://doi.org/10.1109/THMS.2022.3155716).
+
+```bibtex
+@article{gottardi2022shared,
+  title={Shared Control in Robot Teleoperation With Improved Potential Fields},
+  author={Gottardi, Alberto and Tortora, Stefano and Tosello, Elisa and Menegatti, Emanuele},
+  journal={IEEE Transactions on Human-Machine Systems},
+  year={2022},
+  publisher={IEEE}
+}
+```
