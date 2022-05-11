@@ -123,16 +123,11 @@ def setTwist(twist, vmax):
     x = twist[0]
     y = twist[1]
     z = twist[2]
-    
-    #modified vel_x
-    if((x < -vmax) or (x > vmax)):
-        x = np.sign(x) * vmax
-    #modified vel_y
-    if((y < -vmax) or (y > vmax)):
-        y = np.sign(y) * vmax
-    #modified vel_z
-    if((z < -vmax) or (z > vmax)):
-        z = np.sign(z) * vmax
+
+    module_v = math.sqrt(x**2 + y**2 + z**2)
+    x = vmax * x/module_v
+    y = vmax * y/module_v
+    z = vmax * z/module_v
     
     #only linear components
     newTwist = np.zeros(6)

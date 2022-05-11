@@ -60,7 +60,6 @@ class CSP:
 
         #Combining
         result_comb = self.fuzzyCombining()
-        #print("COMBINING: " +str(result_comb))
         #Projection
         result_proj = self.fuzzyProjection(result_comb)
 

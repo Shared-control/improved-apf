@@ -33,43 +33,26 @@ void control_manip::Manipulation::configure(){
 
     m_move_server = m_nh_ptr->advertiseService("move_srv", &control_manip::Manipulation::moveService, this);
 
-    m_cmd_urscript_pub = m_nh_ptr->advertise<std_msgs::String>("/ur5/ur_driver/URScript", 1, true);
+    pub_joints_cmd_ = m_nh_ptr->advertise<control_manip::JointsCmd>("/cmd_joints", 10);
+    joints_move_srv_ = m_nh_ptr->advertiseService("/j_move_srv", &control_manip::Manipulation::serviceJointsMove, this);
+
 }
 
 
 /**
- * Function to move UR with URScript
- * @param next_pose
- * @return true after it has moved
+ * 
  */
-bool control_manip::Manipulation::moveWithScript(geometry_msgs::Pose next_pose){
-    std::string base_frame_id = "base";
-    std::string world = "world";
-
-    //Transform from world frame to base frame
-    tf2_ros::Buffer tf_buffer;
-    tf2_ros::TransformListener tf2_listener(tf_buffer);
-    geometry_msgs::TransformStamped world_to_base = tf_buffer.lookupTransform(base_frame_id, world, ros::Time(0), ros::Duration(5.0));
-    geometry_msgs::PoseStamped input_pose;
-    input_pose.pose = next_pose;
-    geometry_msgs::PoseStamped output_pose;
-    tf2::doTransform(input_pose, output_pose, world_to_base);
-
-    std::stringstream cmd;
-
-    cmd << "def ros_cmd(): \n";
-    cmd << "movep(p[" << output_pose.pose.position.x << ", " << output_pose.pose.position.y << ", " << output_pose.pose.position.z << ", "
-                      << "2.9, -1.10, -0.04], a=0.05, v=0.05, r = 0.0)\n";
-    cmd << "end";
-    
-    //std::cout << cmd.str() << std::endl;
-    std_msgs::String msg;
-    msg.data = cmd.str();
-
-    m_cmd_urscript_pub.publish(msg);
-    ros::Duration(1.0).sleep();
-
-    return true;
+bool control_manip::Manipulation::serviceJointsMove(control_manip::JointsMove::Request& req, control_manip::JointsMove::Response& res){
+    trajectory_msgs::JointTrajectory goal_traj;
+    goal_traj = req.trajectory;
+    goal_traj.header.stamp = ros::Time::now();
+    control_manip::JointsCmd goal;
+    goal.trajectory = goal_traj;
+    goal.publish = true;
+    pub_joints_cmd_.publish(goal);
+    ros::Duration(0.2).sleep();
+    res.done = true;
+    return res.done;
 }
 
 
@@ -84,7 +67,6 @@ bool control_manip::Manipulation::moveService(control_manip::Move::Request &req,
     //Movement, pick and place routine from Command
     //Command: MOVE
     if(req.command.command == req.command.MOVE){
-        //execution_success = moveWithScript(req.command.to_pose);
         execution_success = cartesianPath(req.command.to_pose);
     }
     //Command: PICK
@@ -160,23 +142,24 @@ bool control_manip::Manipulation::goHome(){
         return false;
     }
 
-    //Only in a real environment
-    if(!m_params.simulation){
-        //Activate and close gripper
-        if(m_params.gripper_active){
-            m_gripper_status = m_gripper.activation();
-            if(m_gripper_status == control_manip::Gripper::Status::STOP){
-                ROS_ERROR_STREAM("ERROR: NO ACTIVATION GRIPPER");
-                return false;
-            }
+    //Activate and close gripper
+    if(m_params.gripper_active){
+        m_gripper_status = m_gripper.activation();
+        if(m_gripper_status == control_manip::Gripper::Status::STOP){
+            ROS_ERROR_STREAM("ERROR: NO ACTIVATION GRIPPER");
+            return false;
+        }
 
-            m_gripper_status = m_gripper.close();
-            if(m_gripper_status == control_manip::Gripper::Status::STOP){
-                ROS_ERROR_STREAM("ERROR: NO CLOSING GRIPPER");
-                return false;
-            }
-        }    
+        m_gripper_status = m_gripper.close();
+        if(m_gripper_status == control_manip::Gripper::Status::STOP){
+            ROS_ERROR_STREAM("ERROR: NO CLOSING GRIPPER");
+            return false;
+        }
     }
+
+    std::cout << "Press Enter to continue" <<std::endl;
+    std::cin.ignore();
+
     return true;
 }
 
@@ -304,11 +287,9 @@ void control_manip::Manipulation::updateCollisionScene(std::vector<moveit_msgs::
         vector_old_coll_obj_id.push_back(iter->second.id);
     }
     m_planning_scene->removeCollisionObjects(vector_old_coll_obj_id);
-    //std::cout << "Remove old collision objects" <<std::endl;
-
+    
     //Add new collision objects
     m_planning_scene->addCollisionObjects(collision_object_vector);
-    //std::cout << "Add new collision objects in the scene" <<std::endl;
 }
 
 
@@ -328,6 +309,11 @@ std::vector<double> control_manip::Manipulation::getCurrentJoint(){
  * @return true if pick has been completed, false otherwise
  */
 bool control_manip::Manipulation::pick(geometry_msgs::Pose pose){
+    control_manip::JointsCmd goal;
+    goal.publish = false;
+    pub_joints_cmd_.publish(goal);
+    ros::Duration(1.0).sleep();
+
     //Up EE
     geometry_msgs::Pose up_pose;
     up_pose = pose;
@@ -337,23 +323,20 @@ bool control_manip::Manipulation::pick(geometry_msgs::Pose pose){
         return execution;
     }
 
-    //Only in a real environment
-    if(!m_params.simulation){
-        //Open gripper to pick object
-        m_gripper_status = m_gripper.getStatus();
-        if(m_gripper_status != control_manip::Gripper::Status::OPEN){
-            if(m_gripper_status == control_manip::Gripper::Status::DEACTIVE){
-                ROS_ERROR_STREAM("ERROR: GRIPPER IS DEACTIVE");
-                return false;
-            }
-            m_gripper_status = m_gripper.open();
-            if(m_gripper_status == control_manip::Gripper::Status::STOP){
-                ROS_ERROR_STREAM("ERROR: NO OPEN GRIPPER");
-                return false;
-            }
+    //Open gripper to pick object
+    m_gripper_status = m_gripper.getStatus();
+    if(m_gripper_status != control_manip::Gripper::Status::OPEN){
+        if(m_gripper_status == control_manip::Gripper::Status::DEACTIVE){
+            ROS_ERROR_STREAM("ERROR: GRIPPER IS DEACTIVE");
+            return false;
+        }
+        m_gripper_status = m_gripper.open();
+        if(m_gripper_status == control_manip::Gripper::Status::STOP){
+            ROS_ERROR_STREAM("ERROR: NO OPEN GRIPPER");
+            return false;
         }
     }
-
+    
     //Down EE
     geometry_msgs::Pose final_pose;
     final_pose.position = pose.position;
@@ -364,23 +347,20 @@ bool control_manip::Manipulation::pick(geometry_msgs::Pose pose){
         return execution;
     }
 
-    //Only in a real environment
-    if(!m_params.simulation){
-        //std::cout << "Close" <<std::endl;
-        m_gripper_status = m_gripper.close();
-        if(m_gripper_status == control_manip::Gripper::Status::STOP){
-            ROS_ERROR_STREAM("ERROR: NO CLOSING GRIPPER");
-            return false;
-        }
+    //std::cout << "Close" <<std::endl;
+    m_gripper_status = m_gripper.close();
+    if(m_gripper_status == control_manip::Gripper::Status::STOP){
+        ROS_ERROR_STREAM("ERROR: NO CLOSING GRIPPER");
+        return false;
+    }
 
-        ros::Duration(1.0).sleep();
+    ros::Duration(1.0).sleep();
 
-        //std::cout << "Open" <<std::endl;
-        m_gripper_status = m_gripper.open();
-        if(m_gripper_status == control_manip::Gripper::Status::STOP){
-            ROS_ERROR_STREAM("ERROR: NO OPEN GRIPPER");
-            return false;
-        }
+    //std::cout << "Open" <<std::endl;
+    m_gripper_status = m_gripper.open();
+    if(m_gripper_status == control_manip::Gripper::Status::STOP){
+        ROS_ERROR_STREAM("ERROR: NO OPEN GRIPPER");
+        return false;
     }
 
     return true;
@@ -393,6 +373,11 @@ bool control_manip::Manipulation::pick(geometry_msgs::Pose pose){
  * @return true if place has been completed, false otherwise
  */
 bool control_manip::Manipulation::place(geometry_msgs::Pose pose){
+    control_manip::JointsCmd goal;
+    goal.publish = false;
+    pub_joints_cmd_.publish(goal);
+    ros::Duration(1.0).sleep();
+    
     //Up EE
     pose.position.z = 1.27;
     bool execution = cartesianPath(pose);  
@@ -400,20 +385,17 @@ bool control_manip::Manipulation::place(geometry_msgs::Pose pose){
         return execution;
     }
 
-    //Only in a real environment
-    if(!m_params.simulation){
-        //Close gripper
-        m_gripper_status = m_gripper.getStatus();
-        if(m_gripper_status != control_manip::Gripper::Status::CLOSE){
-            if(m_gripper_status == control_manip::Gripper::Status::DEACTIVE){
-                ROS_ERROR_STREAM("ERROR: GRIPPER IS DEACTIVE");
-                return false;
-            }
-            m_gripper_status = m_gripper.close();
-            if(m_gripper_status == control_manip::Gripper::Status::STOP){
-                ROS_ERROR_STREAM("ERROR: NO CLOSING GRIPPER");
-                return false;
-            }
+    //Close gripper
+    m_gripper_status = m_gripper.getStatus();
+    if(m_gripper_status != control_manip::Gripper::Status::CLOSE){
+        if(m_gripper_status == control_manip::Gripper::Status::DEACTIVE){
+            ROS_ERROR_STREAM("ERROR: GRIPPER IS DEACTIVE");
+            return false;
+        }
+        m_gripper_status = m_gripper.close();
+        if(m_gripper_status == control_manip::Gripper::Status::STOP){
+            ROS_ERROR_STREAM("ERROR: NO CLOSING GRIPPER");
+            return false;
         }
     }
 
@@ -468,8 +450,24 @@ void control_manip::Manipulation::visualizeMarkerGrasping(std::vector<geometry_m
     for(int j = 0; j < grasping_points.size(); j++){   
         marker_point.points.push_back(grasping_points.at(j).pose.position);
     }
-    //std::cout << "Add grasping points in the scene" << std::endl;
     m_pub_marker.publish(marker_point);
 }
 
 
+/**
+ * Update scene with new collision objects
+ * @param collision_object_vector vector of moveit_msgs::CollisionObject
+ * @param color_object_vector vector of ObjectColor
+ */
+void control_manip::Manipulation::updateCollisionScene(std::vector<moveit_msgs::CollisionObject> collision_object_vector, std::vector<moveit_msgs::ObjectColor> color_object_vector){
+    //Get ID of all collision objects into scene to remove 
+    std::vector<std::string> vector_old_coll_obj_id;
+    std::map<std::string, moveit_msgs::CollisionObject> c_o = m_planning_scene->getObjects();
+    for(std::map<std::string, moveit_msgs::CollisionObject>::iterator iter = c_o.begin(); iter != c_o.end(); ++iter){
+        vector_old_coll_obj_id.push_back(iter->second.id);
+    }
+    m_planning_scene->removeCollisionObjects(vector_old_coll_obj_id);
+    
+    //Add new collision objects
+    m_planning_scene->addCollisionObjects(collision_object_vector, color_object_vector);
+}

@@ -47,6 +47,12 @@ namespace control_manip{
 
             moveit_msgs::CollisionObject createWall();
 
+            void createCollisionForRviz();
+
+            moveit_msgs::CollisionObject createCollisionObject(Object object);
+            moveit_msgs::CollisionObject createSupportCollision(Object object);
+
+
     };
 }
 

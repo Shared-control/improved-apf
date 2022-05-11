@@ -47,7 +47,7 @@ void myo::MyoController::configure(std::string t_axis []){
     //Set Publisher and Subscribers
     pub_command = m_nh.advertise<myo::MyoCommand>("myo_command", 1);
     sub_imu = m_nh.subscribe("imu", 20, &myo::MyoController::callbackImu, this);
-    sub_gesture = m_nh.subscribe("gesture", 20, &myo::MyoController::callbackGesture, this);
+    //sub_gesture = m_nh.subscribe("gesture", 20, &myo::MyoController::callbackGesture, this);
 
     m_reset_server = m_nh.advertiseService("reset_myo_srv", &myo::MyoController::resetMyoService, this);
     

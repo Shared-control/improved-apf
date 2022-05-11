@@ -28,6 +28,8 @@ namespace control_manip{
             void createGraspingPoints(std::string frame_id);
             std::vector<geometry_msgs::PoseStamped> getGraspingPoints();
             visualization_msgs::Marker visualizeGraspingPoints();
+
+            geometry_msgs::PoseArray getSupport();
             
         private:
             int id;     //tag's ID
@@ -56,6 +58,9 @@ namespace control_manip{
             void createObstacle();
             void createObstacleCollisionObject(std::string frame_id);
             void createEscapePoints();
+
+            void createSupport();
+            geometry_msgs::PoseArray support_points;
 
     };
 }

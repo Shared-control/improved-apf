@@ -17,6 +17,9 @@
 #include <control_manip/Move.h>
 #include <control_manip/gripper.h>
 
+#include <control_manip/JointsMove.h>
+#include <control_manip/JointsCmd.h>
+
 namespace control_manip{
     
     struct InputParameters{
@@ -42,6 +45,7 @@ namespace control_manip{
             bool place(geometry_msgs::Pose pose);
             void addCollisionObjectToScene(moveit_msgs::CollisionObject collision_object);
             void updateCollisionScene(std::vector<moveit_msgs::CollisionObject> collision_object_vector);
+            void updateCollisionScene(std::vector<moveit_msgs::CollisionObject> collision_object_vector, std::vector<moveit_msgs::ObjectColor> color_object_vector);
             std::vector<double> getCurrentJoint();
 
             void visualizeMarkerEscape(std::vector<geometry_msgs::PoseArray> escape_points);
@@ -76,8 +80,9 @@ namespace control_manip{
             Gripper m_gripper;
             Gripper::Status m_gripper_status = Gripper::Status::DEACTIVE;
 
-            ros::Publisher m_cmd_urscript_pub;
-            bool moveWithScript(geometry_msgs::Pose next_pose);
+            bool serviceJointsMove(control_manip::JointsMove::Request& req, control_manip::JointsMove::Response& res);
+            ros::Publisher pub_joints_cmd_;
+            ros::ServiceServer joints_move_srv_;
 
     };
 }

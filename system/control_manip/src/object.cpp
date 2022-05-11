@@ -16,7 +16,7 @@ control_manip::Object::Object(int obj_id, geometry_msgs::PoseStamped apriltagDet
     else if(id >= 4 && id < 6){
         stream << "cylinder_" << id;
         type = 1;
-        height = 0.2;
+        height = 0.50; //0.2;
         radius = 0.05;
     }
     else if(id >= 6){
@@ -79,7 +79,7 @@ void control_manip::Object::setCenter(geometry_msgs::PoseStamped pose){
         center.position.z = pose.pose.position.z;// + height;
     }
     else if(id >= 4 && id < 6){
-        center.position.z = pose.pose.position.z - 0.05;// - height/2; //+ 0.19
+        center.position.z = pose.pose.position.z - 0.20;// - height/2; //+ 0.19
     }
     else{
         center.position.z = pose.pose.position.z + 0.005; // + height;// - height/2;
@@ -304,20 +304,23 @@ void control_manip::Object::createObstacle(){
     obs2.position = center.position;
     obs2.orientation = center.orientation;
     obstacle.poses.push_back(obs2);
-    for(double h = 0; h <= 4; h++){
+
+    
+    const int LIMIT_NUMBER = 20;
+    for(double h = 0; h <= LIMIT_NUMBER; h++){
         while(theta < 2*M_PI){
             //Cube obstacle
             if(id >= 6){
                 //side face
                 obs2.position.x = center.position.x + rho*cos(theta);
                 obs2.position.y = center.position.y + rho*sin(theta);
-                obs2.position.z = center.position.z + (height/2)*(h/4);
+                obs2.position.z = center.position.z + (height/2)*(h/LIMIT_NUMBER);
                 obs2.orientation = center.orientation;
                 obstacle.poses.push_back(obs2);
                 //corners
                 obs2.position.x = center.position.x + d*cos(beta);
                 obs2.position.y = center.position.y + d*sin(beta);
-                obs2.position.z = center.position.z + (height/2)*(h/4);
+                obs2.position.z = center.position.z + (height/2)*(h/LIMIT_NUMBER);
                 obs2.orientation = center.orientation;
                 obstacle.poses.push_back(obs2);
 
@@ -325,13 +328,13 @@ void control_manip::Object::createObstacle(){
                     //side face
                     obs2.position.x = center.position.x + rho*cos(theta);
                     obs2.position.y = center.position.y + rho*sin(theta);
-                    obs2.position.z = center.position.z - (height/2)*(h/4);
+                    obs2.position.z = center.position.z - (height/2)*(h/LIMIT_NUMBER);
                     obs2.orientation = center.orientation;
                     obstacle.poses.push_back(obs2);
                     //corners
                     obs2.position.x = center.position.x + d*cos(beta);
                     obs2.position.y = center.position.y + d*sin(beta);
-                    obs2.position.z = center.position.z - (height/2)*(h/4);
+                    obs2.position.z = center.position.z - (height/2)*(h/LIMIT_NUMBER);
                     obs2.orientation = center.orientation;
                     obstacle.poses.push_back(obs2);
                 }
@@ -342,22 +345,25 @@ void control_manip::Object::createObstacle(){
             else{
                 obs2.position.x = center.position.x + rho*cos(theta);
                 obs2.position.y = center.position.y + rho*sin(theta);
-                obs2.position.z = center.position.z + (height/2)*(h/4);
+                obs2.position.z = center.position.z + (height/2)*(h/LIMIT_NUMBER);
                 obs2.orientation = center.orientation;
                 obstacle.poses.push_back(obs2);
 
                 if(h != 0){
                     obs2.position.x = center.position.x + rho*cos(theta);
                     obs2.position.y = center.position.y + rho*sin(theta);
-                    obs2.position.z = center.position.z - (height/2)*(h/4);
+                    obs2.position.z = center.position.z - (height/2)*(h/LIMIT_NUMBER);
                     obs2.orientation = center.orientation;
-                    obstacle.poses.push_back(obs2);
+                    if(obs2.position.z >= 0.95){
+                        obstacle.poses.push_back(obs2);
+                    }
                 }
                 theta += M_PI/6;
             }
         }
         theta = 0;
     }
+    
 
 }
 
@@ -398,10 +404,12 @@ void control_manip::Object::createObstacleCollisionObject(std::string frame_id){
  * Create escape points
  */
 void control_manip::Object::createEscapePoints(){
-    double rho = 0.09;
+    double rho = 0.15; //0.11; //0.09;
     double d = sqrt(2)*rho;
     double beta = asin(rho/d);
+    double theta = 0;
 
+    /*
     geometry_msgs::Pose point;
     for(int i = 0; i < 4; i++){
         point.position.x = center.position.x + d*cos(beta);
@@ -412,6 +420,83 @@ void control_manip::Object::createEscapePoints(){
 
         beta += M_PI/2;
     }
+    */
+
+    geometry_msgs::Pose obs2;
+
+    //first point
+    obs2.position = center.position;
+    obs2.position.z += height/2 + 0.10;
+    obs2.orientation = center.orientation;
+    escape_points.poses.push_back(obs2);
+
+    const int LIMIT_NUMBER = 2;
+    for(double h = 0; h <= LIMIT_NUMBER; h++){
+        while(theta < 2*M_PI){
+            //Cube obstacle
+            if(id >= 6){
+                //side face
+                obs2.position.x = center.position.x + rho*cos(theta);
+                obs2.position.y = center.position.y + rho*sin(theta);
+                obs2.position.z = center.position.z + (height/2)*(h/LIMIT_NUMBER);
+                obs2.orientation = center.orientation;
+                escape_points.poses.push_back(obs2);
+                //corners
+                obs2.position.x = center.position.x + d*cos(beta);
+                obs2.position.y = center.position.y + d*sin(beta);
+                obs2.position.z = center.position.z + (height/2)*(h/LIMIT_NUMBER);
+                obs2.orientation = center.orientation;
+                escape_points.poses.push_back(obs2);
+
+                /*
+                if(h != 0){
+                    //side face
+                    obs2.position.x = center.position.x + rho*cos(theta);
+                    obs2.position.y = center.position.y + rho*sin(theta);
+                    obs2.position.z = center.position.z - (height/2)*(h/LIMIT_NUMBER);
+                    obs2.orientation = center.orientation;
+                    escape_points.poses.push_back(obs2);
+                    //corners
+                    obs2.position.x = center.position.x + d*cos(beta);
+                    obs2.position.y = center.position.y + d*sin(beta);
+                    obs2.position.z = center.position.z - (height/2)*(h/LIMIT_NUMBER);
+                    obs2.orientation = center.orientation;
+                    escape_points.poses.push_back(obs2);
+                }
+                */
+                theta += M_PI/2;
+                beta += M_PI/2;
+            }
+            //Prism obstacle
+            else{
+                obs2.position.x = center.position.x + rho*cos(theta);
+                obs2.position.y = center.position.y + rho*sin(theta);
+                obs2.position.z = center.position.z + (height/2)*(h/LIMIT_NUMBER) + 0.03;
+                obs2.orientation = center.orientation;
+                if(obs2.position.z >= 0.95){
+                    escape_points.poses.push_back(obs2);
+                }
+                
+
+                /*
+                if(h != 0){
+                    obs2.position.x = center.position.x + rho*cos(theta);
+                    obs2.position.y = center.position.y + rho*sin(theta);
+                    obs2.position.z = center.position.z - (height/2)*(h/LIMIT_NUMBER);
+                    obs2.orientation = center.orientation;
+                    if(obs2.position.z >= 0.90){
+                        escape_points.poses.push_back(obs2);
+                    }
+                }
+                */
+                theta += M_PI/3;
+            }
+        }
+        theta = 0;
+    }
+
+
+
 }
 
 
@@ -476,4 +561,84 @@ std::vector<double> control_manip::Object::getDimension(){
     return dimensions;
 }
 
+
+
+void control_manip::Object::createSupport(){
+    double rho;
+    if(id >= 6){
+        rho = length/2;
+    }
+    else{
+        rho = radius;
+    }
+    double d = sqrt(2)*rho;
+    double theta = 0;
+    double beta = asin(rho/d);
+
+    geometry_msgs::Pose obs3;
+    geometry_msgs::Pose obs2;
+    obs3.position = center.position;
+    obs3.position.z -= (0.09 + height/2); 
+    obs3.orientation = center.orientation;
+
+    for(double h = 0; h <= 4; h++){
+        while(theta < 2*M_PI){
+            //Cube obstacle
+            if(id >= 6){
+                //side face
+                obs2.position.x = obs3.position.x + rho*cos(theta);
+                obs2.position.y = obs3.position.y + rho*sin(theta);
+                obs2.position.z = obs3.position.z + (height/2)*(h/4);
+                obs2.orientation = obs3.orientation;
+                support_points.poses.push_back(obs2);
+                //corners
+                obs2.position.x = obs3.position.x + d*cos(beta);
+                obs2.position.y = obs3.position.y + d*sin(beta);
+                obs2.position.z = obs3.position.z + (height/2)*(h/4);
+                obs2.orientation = obs3.orientation;
+                support_points.poses.push_back(obs2);
+
+                if(h != 0){
+                    //side face
+                    obs2.position.x = obs3.position.x + rho*cos(theta);
+                    obs2.position.y = obs3.position.y + rho*sin(theta);
+                    obs2.position.z = obs3.position.z - (height/2)*(h/4);
+                    obs2.orientation = obs3.orientation;
+                    support_points.poses.push_back(obs2);
+                    //corners
+                    obs2.position.x = obs3.position.x + d*cos(beta);
+                    obs2.position.y = obs3.position.y + d*sin(beta);
+                    obs2.position.z = obs3.position.z - (height/2)*(h/4);
+                    obs2.orientation = obs3.orientation;
+                    support_points.poses.push_back(obs2);
+                }
+                theta += M_PI/2;
+                beta += M_PI/2;
+            }
+            //Prism obstacle
+            else{
+                obs2.position.x = obs3.position.x + rho*cos(theta);
+                obs2.position.y = obs3.position.y + rho*sin(theta);
+                obs2.position.z = obs3.position.z + (height/2)*(h/4);
+                obs2.orientation = obs3.orientation;
+                support_points.poses.push_back(obs2);
+
+                if(h != 0){
+                    obs2.position.x = obs3.position.x + rho*cos(theta);
+                    obs2.position.y = obs3.position.y + rho*sin(theta);
+                    obs2.position.z = obs3.position.z - (height/2)*(h/4);
+                    obs2.orientation = obs3.orientation;
+                    support_points.poses.push_back(obs2);
+                }
+                theta += M_PI/6;
+            }
+        }
+        theta = 0;
+    }
+}
+
+
+geometry_msgs::PoseArray control_manip::Object::getSupport(){
+    return support_points;
+}
 

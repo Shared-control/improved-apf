@@ -1,0 +1,2 @@
+trajectory_msgs/JointTrajectory trajectory
+bool publish

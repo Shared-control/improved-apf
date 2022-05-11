@@ -24,7 +24,7 @@ class Clik:
 
         self._limit_z = 0.90
         
-    def computeCLIK(self, actual_position, twist_ee, jacobian):
+    def computeCLIK(self, actual_position, twist_ee, jacobian, new_q):
         """
         Use CLIK to compute new joints vector q and ee pose \n
         Args:
@@ -36,6 +36,7 @@ class Clik:
             new pose of EE
             final twist used to compute new joints vector and ee pose
         """
+        self._init_q = new_q
         twist_f = np.zeros(6)
         done = self.doCLIK(actual_position, twist_ee, jacobian)
         if(not done):

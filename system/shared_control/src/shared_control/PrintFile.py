@@ -94,8 +94,6 @@ class PrintFile:
         if(not os.path.exists(self._final_path)):
             os.mkdir(self._final_path) 
 
-               
-
     
     def write(self, info):
         """

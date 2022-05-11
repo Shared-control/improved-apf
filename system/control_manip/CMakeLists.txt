@@ -58,6 +58,7 @@ add_message_files(
   GoalArray.msg
   Status.msg
   Objects.msg
+  JointsCmd.msg
 )
 
 ## Generate services in the 'srv' folder
@@ -65,6 +66,7 @@ add_service_files(
   FILES
   InitObj.srv
   Move.srv
+  JointsMove.srv
 )
 
 ## Generate actions in the 'action' folder
@@ -184,6 +186,7 @@ target_link_libraries(
 ## With catkin_make all packages are built within a single CMake context
 ## The recommended prefix ensures that target names across packages don't collide
 add_executable(${PROJECT_NAME}_manager_node src/node_manager.cpp)
+add_executable(${PROJECT_NAME}_joints_node src/joints_node.cpp)
 
 ## Rename C++ executable without prefix
 ## The above recommended prefix causes long target names, the following renames the
@@ -204,6 +207,11 @@ target_link_libraries(
   ${PROJECT_NAME}_utils
   ${PROJECT_NAME}_manager
   ${PROJECT_NAME}_gripper
+)
+
+target_link_libraries(
+  ${PROJECT_NAME}_joints_node
+  ${catkin_LIBRARIES}
 )
 
 
